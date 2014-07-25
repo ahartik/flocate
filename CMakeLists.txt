@@ -4,12 +4,13 @@ cmake_minimum_required(VERSION 2.6.0)
 project(csa CXX C)
 ADD_DEFINITIONS(
    -O3
+   # -g
   -std=c++0x
   -Wall
   -march=native
   )
 
-# set(CMAKE_BUILD_TYPE "Debug")
+set(CMAKE_BUILD_TYPE "Debug")
 
 include_directories(
   )

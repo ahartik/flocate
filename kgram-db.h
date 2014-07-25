@@ -5,26 +5,28 @@
 
 class KGramDB {
  public:
+  struct IntervalList {
+    format::Interval* list;
+    size_t size;
+    size_t total;
+  };
 
   KGramDB(const std::string& file);
   ~KGramDB();
-  format::Dir getDir(format::FileID id) const;
-  format::File getFile(format::FileID id) const;
-  const char* getName(uint64_t start) const;
-  format::FileID* getList(uint64_t start) const;
-  format::KGram getKGram(uint64_t id) const;
-  bool isDir(format::FileID) const;
-  static const format::FileID ROOT = format::DIR_BIT;
+  const char* getName(format::ID id) const;
+  format::ID getParent(format::ID id) const;
+  IntervalList getList(uint64_t kgram) const;
+  void getFullPath(format::ID id, std::string* out) const;
 
-  void getFullPath(format::FileID id, std::string* out) const;
+  static const format::ID ROOT = 0;
  private:
   format::Header header_;
   int fd_;
   void* mapping_;
   size_t map_size_;
-  format::Dir* dirs_;
-  format::File* files_;
-  format::FileID* lists_;
+  format::Entry* entries_;
   format::KGram* kgrams_;
+  size_t kgrams_size_;
+  format::Interval* lists_;
   const char* names_;
 };

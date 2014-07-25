@@ -1,21 +1,23 @@
 #include "kgram-db.h"
 
-std::string tmp;
-void listAll(KGramDB& db, format::FileID id, int depth) {
-  tmp.clear();
-  db.getFullPath(id, &tmp);
-  std::cout << tmp << "\n";
-  if (depth == 0) return;
-  if (db.isDir(id)) {
-    format::Dir d = db.getDir(id);
-    format::FileID* list = db.getList(d.ls_id);
-    for (unsigned i = 0; i < d.ls_len; ++i) {
-      listAll(db, list[i], depth -1);
+using namespace std;
+
+void listAll(KGramDB& db, string kgram) {
+  uint64_t id = format::KGramToID(kgram.c_str(), kgram.size());
+  KGramDB::IntervalList list = db.getList(id);
+  std::string name;
+  for (size_t i = 0; i < list.size; ++i) {
+    for (format::ID f = list.list[i].begin;
+         f != list.list[i].end;
+         ++f) {
+      db.getFullPath(f, &name);
+      std::cout << name << "\n";
+      name.clear();
     }
   }
 }
 
 int main() {
   KGramDB db("kgram.db");
-  listAll(db, KGramDB::ROOT, 3);
+  listAll(db, "aba");
 }
