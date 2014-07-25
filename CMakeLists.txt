@@ -4,7 +4,7 @@ cmake_minimum_required(VERSION 2.6.0)
 project(csa CXX C)
 ADD_DEFINITIONS(
    -O3
-   # -g
+   #  -g
   -std=c++0x
   -Wall
   -march=native

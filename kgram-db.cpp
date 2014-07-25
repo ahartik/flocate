@@ -1,6 +1,7 @@
 #include "kgram-db.h"
 #include <stdexcept>
 #include <cassert>
+#include <algorithm>
 
 #include <iostream>
 #include <unistd.h>
@@ -14,6 +15,77 @@
     if (!(x)) { \
       throw std::runtime_error(std::string(msg) + " : " + strerror(errno)); \
     }
+
+static bool rangeCmp(format::Interval a, format::Interval b) {
+  return a.end <= b.begin;
+}
+
+size_t KGramDB::IntervalList::find(format::ID id) const {
+  auto it = std::lower_bound(list, list + size_, format::Interval(id, id + 1), rangeCmp);
+  if (it == list + size_) return size_;
+  if (it->begin > id || it->end <= id) return size_;
+  return it - list;
+}
+
+std::pair<size_t,size_t> KGramDB::IntervalList::findRange(format::Interval iv) const {
+  auto p = std::equal_range(list, list + size(), iv, &rangeCmp);
+  return std::pair<size_t, size_t>(p.first - list, p.second - list);
+}
+
+KGramDB::PathIterator::PathIterator(const KGramDB* db, format::ID id) {
+  this->db = db;
+  setID(id);
+}
+
+void KGramDB::PathIterator::addDir(format::ID id) {
+  if (id == ROOT) {
+    str.push_back('/');
+  } else {
+    format::ID parent = db->getParent(id);
+    const char* name = db->getName(id);
+    addDir(parent);
+    if (parent != ROOT) {
+      str.push_back('/');
+    }
+    str.append(name);
+  }
+  stack.push_back(id);
+  parts.push_back(str.size());
+}
+
+void KGramDB::PathIterator::setID(format::ID id) {
+  str.clear();
+  stack.clear();
+  parts.clear();
+  addDir(id);
+}
+
+void KGramDB::PathIterator::next() {
+  format::ID last = stack.back();
+  format::ID next = last + 1;
+  if (db->numEntries() <= next) {
+    str.clear();
+    stack.clear();
+    parts.clear();
+    stack.push_back(next);
+    end_ = true;
+    return;
+  }
+  format::ID p = db->getParent(next);
+  const char* name = db->getName(next);
+  while (p != stack.back()) {
+    stack.pop_back();
+    parts.pop_back();
+    str.resize(parts.back());
+  }
+
+  if (stack.back() != ROOT) {
+    str.push_back('/');
+  }
+  str.append(name);
+  stack.push_back(next);
+  parts.push_back(str.size());
+}
 
 KGramDB::KGramDB(const std::string& file) {
   fd_ = open(file.c_str(), O_RDONLY);
@@ -62,8 +134,15 @@ format::ID KGramDB::getParent(format::ID id) const {
   return entries_[id].parent;
 }
 
+format::ID KGramDB::numEntries() const {
+  size_t ent_start = sizeof(header_);
+  size_t dist = (header_.kgram_start - ent_start);
+  assert(dist % sizeof(format::Entry) == 0);
+  return dist / sizeof(format::Entry);
+}
+
+
 KGramDB::IntervalList KGramDB::getList(uint64_t kgram) const {
-  IntervalList ret;
   // binary search for right kgram
   uint64_t left = 0;
   uint64_t right = kgrams_size_;
@@ -78,18 +157,14 @@ KGramDB::IntervalList KGramDB::getList(uint64_t kgram) const {
 
   if (left == kgrams_size_ ||
       kgrams_[left].kgram != kgram) {
-    ret.list = nullptr;
-    ret.size = 0;
-    ret.total = 0;
     std::cout << "kgram " << kgram << " not found \n";
     std::cout << "left = " << left << "\n";
-    std::cout << "kgrams_size_ = " << kgrams_size_ << "\n";
     std::cout << kgrams_[left-1].kgram << " " << kgrams_[left].kgram << "\n";
+    return IntervalList(0,0,0);
   } else {
     format::KGram found = kgrams_[left];
-    ret.list = lists_ + found.ls_start;
-    ret.size = found.ls_len;
-    ret.total = found.count;
+    return IntervalList(lists_ + found.ls_start,
+                        found.ls_len,
+                        found.count);
   }
-  return ret;
 }

@@ -12,6 +12,8 @@
 #include <cstring>
 #include <map>
 
+#include <sys/stat.h>
+#include <unistd.h>
 #include "db-format.h"
 
 using namespace std;
@@ -53,8 +55,9 @@ void addKGrams(const char* name, format::Interval iv) {
   for (int i = 0; name[i] != 0; ++i) {
     for (int j = 1; j <= K; ++j) {
       uint64_t kid = format::KGramToID(name + i, j);
-      kgram_map[kid].list.push_back(iv);
-      kgram_map[kid].count += count;
+      KGram& kgram = kgram_map[kid];
+      kgram.list.push_back(iv);
+      kgram.count += count;
       if (name[i + j] == 0) break;
     }
   }
@@ -85,22 +88,33 @@ format::ID addDir(string& path, const char* name, format::ID parent) {
   entries.emplace_back();
   entries[id].name = addName(name);
   entries[id].parent = parent;
-  struct dirent* ent;
+
+  // sort entries
+  vector<string> ls;
+  {
+    struct dirent* ent;
+    while ((ent = readdir(dir))) {
+      if (strcmp(ent->d_name, ".") == 0 ||
+          strcmp(ent->d_name, "..") == 0) {
+        continue;
+      }
+      ls.push_back(ent->d_name);
+    }
+  }
+  std::sort(ls.begin(), ls.end());
   
-  while ((ent = readdir(dir))) {
-    if (strcmp(ent->d_name, ".") == 0 ||
-        strcmp(ent->d_name, "..") == 0) {
-      continue;
-    }
-    if (ent->d_type == DT_DIR) {
-      size_t s = path.size();
-      path.append(ent->d_name);
+  for (const std::string& ent : ls) {
+    struct stat sb;
+    size_t s = path.size();
+    path.append(ent);
+    lstat(path.c_str(), &sb);
+    if (S_ISDIR(sb.st_mode)) {
       path.push_back('/');
-      addDir(path, ent->d_name, id);
-      path.resize(s);
+      addDir(path, ent.c_str(), id);
     } else {
-      addFile(ent->d_name, id);
+      addFile(ent.c_str(), id);
     }
+    path.resize(s);
   }
   closedir(dir);
 
