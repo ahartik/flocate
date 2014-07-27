@@ -1,9 +1,6 @@
 #include "kgram-db.h"
 #include "interval-set.h"
 
-#ifdef USE_REGEX
-#include <re2/re2.h>
-#endif 
 #include <vector>
 #include <string>
 #include <iostream>
@@ -13,31 +10,21 @@
 using namespace std;
 const int K = 3;
 
-#ifdef USE_REGEX
-re2::RE2* regexp;
-#endif
-
 KGramDB* db;
 KGramDB::PathIterator* path_iter;
 
 vector<string> patterns;
 
-bool print_debug = true;
+bool print_debug = false;
 
 size_t filtered_count = 0;
 
 bool match(const string& path) {
-#if USE_REGEX
-  return re2::RE2::PartialMatch(path, *regexp);
-#elif 1
   for (const string& pattern : patterns) {
     if (strstr(path.c_str(), pattern.c_str()) != nullptr)
       return true;
   }
   return false;
-#else 
-  return path.find(pattern) != string::npos;
-#endif
 }
 
 void printMatching(IntervalSetPtr set) {
@@ -66,15 +53,6 @@ int main(int argc, char** argv) {
   if (patterns.size() == 0) {
     std::cerr << "usage: " << argv[0] << " PATTERN...\n";
   }
-#ifdef USE_REGEX
-  string regex_str;
-  for (string pat : patterns) {
-    regex_str += pat;
-    regex_str += "|";
-  }
-  re2::RE2 regex(regex_str);
-  ::regexp = &regex;
-#endif
   // Build IntervalSetOr of patterns
   
   IntervalSetVector or_vec;
@@ -136,8 +114,8 @@ int main(int argc, char** argv) {
     or_vec.emplace_back(andIntervalSet(and_vec));
   }
   IntervalSetPtr or_set = orIntervalSet(or_vec);
-  // if (or_vec.size() == 1)
-  //   or_set = or_vec[0];
+  if (or_vec.size() == 1)
+    or_set = or_vec[0];
   printMatching(or_set);
   std::cerr << "filtered_count: " << filtered_count << "\n";
   return 0;
