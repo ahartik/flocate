@@ -20,4 +20,4 @@ link_directories(
 
 add_executable(build build.cpp)
 add_executable(kgram-db_test kgram-db_test.cpp kgram-db.cpp)
-add_executable(locate locate.cpp kgram-db.cpp)
+add_executable(locate locate.cpp kgram-db.cpp interval-set.cpp)

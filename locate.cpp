@@ -1,8 +1,11 @@
 #include "kgram-db.h"
+#include "interval-set.h"
+
 #include <vector>
 #include <string>
 #include <iostream>
 #include <algorithm>
+#include <cstring>
 
 using namespace std;
 const int K = 3;
@@ -11,9 +14,15 @@ string pattern;
 KGramDB* db;
 KGramDB::PathIterator* path_iter;
 
+
 bool match(const string& path) {
+#if 1
+  return strstr(path.c_str(), pattern.c_str()) != nullptr;
+#else 
   return path.find(pattern) != string::npos;
+#endif
 }
+
 void filterPrint(format::Interval iv, const vector<KGramDB::IntervalList>& lists, size_t start ) {
   if (iv.end <= iv.begin) return;
   if (start == lists.size()) {
@@ -27,9 +36,9 @@ void filterPrint(format::Interval iv, const vector<KGramDB::IntervalList>& lists
     return;
   }
   const KGramDB::IntervalList& ivl = lists[start];
-  auto range = lists[start].findRange(iv);
+  auto range = ivl.findRange(iv);
   for (size_t i = range.first; i < range.second; ++i) {
-    format::Interval iv2 = lists[start][i];
+    format::Interval iv2 = ivl[i];
     iv2.begin = std::max(iv2.begin, iv.begin);
     iv2.end = std::min(iv2.end, iv.end);
     filterPrint(iv2, lists, start + 1);
@@ -38,9 +47,29 @@ void filterPrint(format::Interval iv, const vector<KGramDB::IntervalList>& lists
 
 
 void printMatching(const vector<KGramDB::IntervalList>& ivs) {
+#if 0
   filterPrint(format::Interval(0, db->numEntries()),
               ivs,
               0);
+#else 
+  IntervalSetVector ls;
+  for (auto x : ivs) {
+    ls.emplace_back(std::make_shared<IntervalSetList>(x));
+  }
+  IntervalSetAnd ands(ls);
+  std::unique_ptr<IntervalSetIterator> iter = ands.iterator();
+
+  for (; !iter->end(); iter->next()) {
+    format::Interval iv = iter->get();
+    path_iter->setID(iv.begin);
+    for (format::ID id = iv.begin; id != iv.end; ++id) {
+      if (match(path_iter->path())) {
+        std::cout << path_iter->path() << "\n";
+      }
+      path_iter->next();
+    }
+  }
+#endif
 }
 
 int main(int argc, char** argv) {

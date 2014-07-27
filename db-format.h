@@ -2,6 +2,7 @@
 
 #include <stdint.h>
 
+#include <climits>
 #include <iostream>
 
 namespace format {
@@ -21,6 +22,8 @@ struct Entry {
   uint64_t name;
   ID parent;
 };
+
+static const ID ID_MAX = UINT_MAX;
 
 struct Interval {
   Interval(ID b, ID e) : begin(b), end(e) {}

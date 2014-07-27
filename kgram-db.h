@@ -14,6 +14,13 @@ class KGramDB {
       size_ = size;
       total_ = total;
     }
+
+    const format::Interval* begin() const {
+      return list;
+    }
+    const format::Interval* end() const {
+      return list + size_;
+    }
     const format::Interval& operator[](size_t i) const {
       return list[i];
     }
