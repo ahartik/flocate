@@ -140,9 +140,36 @@ class IntervalSetOrIterator : public IntervalSetIterator {
     for (const auto& s : vec) {
       iters.emplace_back(s->iterator());
     }
+    end_ = false;
+    next();
   }
 
   virtual bool next() {
+    if (end()) return false;
+    format::ID begin = format::ID_MAX;
+    for (auto& iter : iters) {
+      if (!iter->end() && iter->get().begin < begin) {
+        begin = iter->get().begin;
+      }
+    }
+    if (begin == format::ID_MAX) {
+      end_ = true;
+      return false;
+    }
+    cur = format::Interval(begin, begin);
+    bool changed = false;
+    do {
+      changed = false;
+      for (auto& iter : iters) {
+        if (!iter->end() && cur.end >= iter->get().begin) {
+          // merge
+          cur.end = std::max(cur.end, iter->get().end);
+          changed = true;
+          iter->next();
+        }
+      }
+    } while (changed);
+    
     return !end();
   }
 
@@ -151,16 +178,15 @@ class IntervalSetOrIterator : public IntervalSetIterator {
   }
 
   virtual format::Interval get() const {
-    assert(false && "Not implemented");
-    return format::Interval(0,0);
+    return cur;
   }
 
   virtual bool end() const {
-    return true;
+    return end_;
   }
-
  private:
-
+  format::Interval cur;
+  bool end_;
   IntervalSetVector vec;
   std::vector<std::unique_ptr<IntervalSetIterator>> iters;
 };

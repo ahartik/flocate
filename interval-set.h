@@ -57,3 +57,18 @@ class IntervalSetOr : public IntervalSet {
   IntervalSetVector sets_;
   size_t approx_;
 };
+
+// Convenience:
+namespace {
+IntervalSetPtr toIntervalSet(KGramDB::IntervalList list) {
+  return std::make_shared<IntervalSetList>(list);
+}
+
+IntervalSetPtr andIntervalSet(const IntervalSetVector& vec) {
+  return std::make_shared<IntervalSetAnd>(vec);
+}
+
+IntervalSetPtr orIntervalSet(const IntervalSetVector& vec) {
+  return std::make_shared<IntervalSetOr>(vec);
+}
+}

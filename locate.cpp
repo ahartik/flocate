@@ -1,6 +1,9 @@
 #include "kgram-db.h"
 #include "interval-set.h"
 
+#ifdef USE_REGEX
+#include <re2/re2.h>
+#endif 
 #include <vector>
 #include <string>
 #include <iostream>
@@ -10,58 +13,40 @@
 using namespace std;
 const int K = 3;
 
-string pattern;
+#ifdef USE_REGEX
+re2::RE2* regexp;
+#endif
+
 KGramDB* db;
 KGramDB::PathIterator* path_iter;
 
+vector<string> patterns;
+
+bool print_debug = true;
+
+size_t filtered_count = 0;
 
 bool match(const string& path) {
-#if 1
-  return strstr(path.c_str(), pattern.c_str()) != nullptr;
+#if USE_REGEX
+  return re2::RE2::PartialMatch(path, *regexp);
+#elif 1
+  for (const string& pattern : patterns) {
+    if (strstr(path.c_str(), pattern.c_str()) != nullptr)
+      return true;
+  }
+  return false;
 #else 
   return path.find(pattern) != string::npos;
 #endif
 }
 
-void filterPrint(format::Interval iv, const vector<KGramDB::IntervalList>& lists, size_t start ) {
-  if (iv.end <= iv.begin) return;
-  if (start == lists.size()) {
-    path_iter->setID(iv.begin);
-    for (format::ID id = iv.begin; id != iv.end; ++id) {
-      if (match(path_iter->path())) {
-        std::cout << path_iter->path() << "\n";
-      }
-      path_iter->next();
-    }
-    return;
-  }
-  const KGramDB::IntervalList& ivl = lists[start];
-  auto range = ivl.findRange(iv);
-  for (size_t i = range.first; i < range.second; ++i) {
-    format::Interval iv2 = ivl[i];
-    iv2.begin = std::max(iv2.begin, iv.begin);
-    iv2.end = std::min(iv2.end, iv.end);
-    filterPrint(iv2, lists, start + 1);
-  }
-}
-
-
-void printMatching(const vector<KGramDB::IntervalList>& ivs) {
-#if 0
-  filterPrint(format::Interval(0, db->numEntries()),
-              ivs,
-              0);
-#else 
-  IntervalSetVector ls;
-  for (auto x : ivs) {
-    ls.emplace_back(std::make_shared<IntervalSetList>(x));
-  }
-  IntervalSetAnd ands(ls);
-  std::unique_ptr<IntervalSetIterator> iter = ands.iterator();
+void printMatching(IntervalSetPtr set) {
+  std::unique_ptr<IntervalSetIterator> iter = set->iterator();
 
   for (; !iter->end(); iter->next()) {
     format::Interval iv = iter->get();
     path_iter->setID(iv.begin);
+    filtered_count += iv.end - iv.begin;
     for (format::ID id = iv.begin; id != iv.end; ++id) {
       if (match(path_iter->path())) {
         std::cout << path_iter->path() << "\n";
@@ -69,7 +54,6 @@ void printMatching(const vector<KGramDB::IntervalList>& ivs) {
       path_iter->next();
     }
   }
-#endif
 }
 
 int main(int argc, char** argv) {
@@ -78,13 +62,23 @@ int main(int argc, char** argv) {
   KGramDB::PathIterator path_it(&db, KGramDB::ROOT);
   ::path_iter = &path_it;
 
-  std::vector<std::string> patterns(argv + 1, argv + argc);
+  patterns = vector<string>(argv + 1, argv + argc);
   if (patterns.size() == 0) {
     std::cerr << "usage: " << argv[0] << " PATTERN...\n";
   }
-
+#ifdef USE_REGEX
+  string regex_str;
   for (string pat : patterns) {
-    ::pattern = pat;
+    regex_str += pat;
+    regex_str += "|";
+  }
+  re2::RE2 regex(regex_str);
+  ::regexp = &regex;
+#endif
+  // Build IntervalSetOr of patterns
+  
+  IntervalSetVector or_vec;
+  for (string pattern : patterns) {
     std::vector<std::string> kgrams;
     if (pattern.size() <= K) {
       kgrams.push_back(pattern);
@@ -137,8 +131,14 @@ int main(int argc, char** argv) {
     };
 
     std::sort(lists.begin(), lists.end(), cmp);
-
-    printMatching(lists);
+    IntervalSetVector and_vec(lists.size());
+    std::transform(lists.begin(), lists.end(), and_vec.begin(), toIntervalSet);
+    or_vec.emplace_back(andIntervalSet(and_vec));
   }
+  IntervalSetPtr or_set = orIntervalSet(or_vec);
+  // if (or_vec.size() == 1)
+  //   or_set = or_vec[0];
+  printMatching(or_set);
+  std::cerr << "filtered_count: " << filtered_count << "\n";
   return 0;
 }
