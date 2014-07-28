@@ -21,6 +21,7 @@ TODO
 Performance
 ------------
 Speed up compared to mlocate is noticable. On my laptop:
+
     $ time ./locate linux debian > /dev/null 
     real  0m0.045s
     user  0m0.044s
