@@ -1,3 +1,6 @@
+// Copyright 2014 Aleksi Hartikainen.  All Rights Reserved.
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE.txt file.
 #include "kgram-db.h"
 #include "interval-set.h"
 
@@ -117,6 +120,8 @@ int main(int argc, char** argv) {
   if (or_vec.size() == 1)
     or_set = or_vec[0];
   printMatching(or_set);
-  std::cerr << "filtered_count: " << filtered_count << "\n";
+  if (print_debug) {
+    std::cerr << "filtered_count: " << filtered_count << "\n";
+  }
   return 0;
 }
